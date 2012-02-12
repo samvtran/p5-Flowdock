@@ -66,7 +66,7 @@ sub send_message {
 		$params{tags} = $tags if $tags;
 
 		my $ua = LWP::UserAgent->new;
-		my $response = $ua->post( get_flowdock_api_url($self), Content => \%params);
+		my $response = $ua->post( $self->get_flowdock_api_url(), Content => \%params);
 		if ($response->is_success) {
 			print "Success! Your message has been sent to Flowdock.\n";
 		} else {
