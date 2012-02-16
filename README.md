@@ -13,6 +13,7 @@ https://www.flowdock.com/api
 Dependencies
 ------------
 Flowdock::Push requires LWP::UserAgent and Moose.
+
 Flowdock::REST requires Moose, Moose::Util::TypeConstraints, REST::Client, JSON::XS, and Email::Valid.
 
 Known Issues
@@ -37,7 +38,7 @@ my $flow = Flowdock::Push->new(
    source => 'myapp',
    project => 'my project',
    from => { name => 'John Doe', address => 'foo@bar.com' });
-$flow->send_message({
+$flow->send_inbox_message({
    subject => 'Hello, World!',
    content => '<h2>IT'S ALIVE!</h2><p>It's sort of a pun</p>',
    tags => ['not','really'],
@@ -97,6 +98,14 @@ my $response = $rest_message->send_message({
    tags => ['cool', 'beans'],
    link => 'http://flowdock.com'});
 ```
+
+But wait! There's more! You can send multiple messages at once:
+
+```
+my $response = $rest_message->send_message(\%one_hash, \%two_hash, \%three_hash, \%four);
+```
+
+or by separating multiple hashes in {} with a comma
 
 You can view whatever gets returned by using Data::Dumper:
 

@@ -166,7 +166,7 @@ sub send_message {
 
 
 		my $json_params = encode_json \%params;
-		return $self->rest_action_post($url, $json_params);
+		$self->rest_action_post($url, $json_params);
 
 	}
 
@@ -182,8 +182,7 @@ sub rest_action_get {
 	my ($self, $url) = @_;
 	my $client = REST::Client->new();
 	$client->GET($url);
-	my $json_body = decode_json $client->responseContent();
-	return $json_body;
+	return decode_json $client->responseContent();
 }
 
 =head2 rest_action_post
