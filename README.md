@@ -23,14 +23,13 @@ perl -Ilib foo.pl
 ```
 
 Pushing an anonymous message to the Team Inbox:
-```
+```perl
 use Flowdock::Push;
 my $flow = Flowdock::Push->new(
    api_token => 'YOUR_ALPHANUMERIC_TOKEN',
    source => 'myapp',
    project => 'my project',
    from => { name => 'John Doe', address => 'foo@bar.com' });
-
 $flow->send_message({
    subject => 'Hello, World!',
    content => '<h2>IT'S ALIVE!</h2><p>It's sort of a pun</p>',
@@ -39,7 +38,7 @@ $flow->send_message({
 ```
 
 Pushing an anonymous message to the chat:
-```
+```perl
 $flow->send_chat_message({
    content => 'How\'s it going?',
    external_user_name => 'Perlicious',
@@ -47,7 +46,7 @@ $flow->send_chat_message({
 ```
 
 Authenticating with username/password:
-```
+```perl
 use Flowdock::REST;
 my $flow = Flowdock::REST->new(
 	username => 'foo@bar.baz',
@@ -57,7 +56,7 @@ my $flow = Flowdock::REST->new(
 ```
 
 or with a token:
-```
+```perl
 use Flowdock::REST;
 my $flow = Flowdock::REST->new(
 	personal_token => 'YOUR_TOKEN',
@@ -66,7 +65,7 @@ my $flow = Flowdock::REST->new(
 ```
 
 Sending a message to the chat box or setting your status as an authenticated user:
-```
+```perl
 my $response = $rest_message->send_message({
  	event => 'message', #Or 'status' for status updates
  	flow => 'myflow',
@@ -75,7 +74,7 @@ my $response = $rest_message->send_message({
 ```
 
 Sending a message to the Team Inbox as an authenticated user (may be broken...sorry):
-```
+```perl
 my $response = $rest_message->send_message({
 	flow => 'myflow',
 	event => 'mail',
@@ -88,7 +87,7 @@ my $response = $rest_message->send_message({
 ```
 
 You can view whatever gets returned by using Data::Dumper:
-```
+```perl
 use Data::Dumper;
 print Dumper($response);
 ```
