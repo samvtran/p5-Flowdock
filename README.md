@@ -10,6 +10,11 @@ API Notes
 Have a look at the official documentation for more information on the API:
 https://www.flowdock.com/api
 
+Dependencies
+------------
+Flowdock::Push requires LWP::UserAgent and Moose.
+Flowdock::REST requires Moose, Moose::Util::TypeConstraints, REST::Client, JSON::XS, and Email::Valid.
+
 Known Issues
 ------------
 HTML currently doesn't work when sending a message to the Team Inbox via Flowdock::REST. It works fine through Flowdock::Push, however, so use that if you can.

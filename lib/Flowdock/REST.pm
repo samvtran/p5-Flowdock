@@ -5,7 +5,6 @@ use Moose::Util::TypeConstraints;
 use REST::Client;
 use JSON::XS;
 use Email::Valid;
-use feature qw/say/;
 use namespace::autoclean;
 
 =head1 NAME
@@ -198,7 +197,7 @@ sub rest_action_post {
 	my $client = REST::Client->new();
 	if ($param) { $client->POST($url, $param, {"Content-type" => 'application/json'}); }
 	else { croak "This action is empty." }
-	say "Success! Message posted." if $client->responseCode() eq '200';
+	print "Success! Message posted.\n" if $client->responseCode() eq '200';
 	return $client->responseContent();
 
 }
@@ -212,13 +211,9 @@ Constructs the proper URL; i.e., separates the various parts with /
 sub get_flowdock_api_url {
 	my ($self, @url_parts) = @_;
 	my $url = $base_url;
-#	say $url;
-#	use Data::Dumper;
-#	say Dumper(@url_parts);
 	for my $part (@url_parts) {
 		$url.="/$part";
 	}
-#	say $url;
 	return $url;
 }
 __PACKAGE__->meta->make_immutable;
