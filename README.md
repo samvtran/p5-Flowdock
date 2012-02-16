@@ -18,11 +18,13 @@ Usage Example
 ----------------------
 
 To use this experimental module without installing it anywhere, place lib where your Perl script is and run the following so Perl can find the library:
+
 ```
 perl -Ilib foo.pl
 ```
 
 Pushing an anonymous message to the Team Inbox:
+
 ```
 use Flowdock::Push;
 my $flow = Flowdock::Push->new(
@@ -38,6 +40,7 @@ $flow->send_message({
 ```
 
 Pushing an anonymous message to the chat:
+
 ```
 $flow->send_chat_message({
    content => 'How\'s it going?',
@@ -46,6 +49,7 @@ $flow->send_chat_message({
 ```
 
 Authenticating with username/password:
+
 ```
 use Flowdock::REST;
 my $flow = Flowdock::REST->new(
@@ -56,6 +60,7 @@ my $flow = Flowdock::REST->new(
 ```
 
 or with a token:
+
 ```
 use Flowdock::REST;
 my $flow = Flowdock::REST->new(
@@ -65,6 +70,7 @@ my $flow = Flowdock::REST->new(
 ```
 
 Sending a message to the chat box or setting your status as an authenticated user:
+
 ```
 my $response = $rest_message->send_message({
    event => 'message', #Or 'status' for status updates
@@ -74,6 +80,7 @@ my $response = $rest_message->send_message({
 ```
 
 Sending a message to the Team Inbox as an authenticated user (may be broken...sorry):
+
 ```
 my $response = $rest_message->send_message({
    flow => 'myflow',
@@ -87,6 +94,7 @@ my $response = $rest_message->send_message({
 ```
 
 You can view whatever gets returned by using Data::Dumper:
+
 ```
 use Data::Dumper;
 print Dumper($response);
