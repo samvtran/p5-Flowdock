@@ -23,7 +23,7 @@ perl -Ilib foo.pl
 ```
 
 Pushing an anonymous message to the Team Inbox:
-```perl
+```
 use Flowdock::Push;
 my $flow = Flowdock::Push->new(
    api_token => 'YOUR_ALPHANUMERIC_TOKEN',
@@ -38,7 +38,7 @@ $flow->send_message({
 ```
 
 Pushing an anonymous message to the chat:
-```perl
+```
 $flow->send_chat_message({
    content => 'How\'s it going?',
    external_user_name => 'Perlicious',
@@ -46,48 +46,48 @@ $flow->send_chat_message({
 ```
 
 Authenticating with username/password:
-```perl
+```
 use Flowdock::REST;
 my $flow = Flowdock::REST->new(
-	username => 'foo@bar.baz',
-	password => 'frumpy',
-	org => 'kiteward',
-	);
+   username => 'foo@bar.baz',
+   password => 'frumpy',
+   org => 'kiteward',
+   );
 ```
 
 or with a token:
-```perl
+```
 use Flowdock::REST;
 my $flow = Flowdock::REST->new(
-	personal_token => 'YOUR_TOKEN',
-	org => 'foobar',
-	);
+   personal_token => 'YOUR_TOKEN',
+   org => 'foobar',
+   );
 ```
 
 Sending a message to the chat box or setting your status as an authenticated user:
-```perl
+```
 my $response = $rest_message->send_message({
- 	event => 'message', #Or 'status' for status updates
- 	flow => 'myflow',
- 	content => 'Hello, how are you?!',
- 	tags => ["todo", "beans"]});
+   event => 'message', #Or 'status' for status updates
+   flow => 'myflow',
+   content => 'Hello, how are you?!',
+   tags => ["todo", "beans"]});
 ```
 
 Sending a message to the Team Inbox as an authenticated user (may be broken...sorry):
-```perl
+```
 my $response = $rest_message->send_message({
-	flow => 'myflow',
-	event => 'mail',
-	source => 'Perl Flowdock API',
-	address => 'foo@bar.baz',
-	subject => 'Test message',
- 	content => "<h2>IT'S ALIVE</h2><p>This is only slightly crazy.</p>",
- 	tags => ['cool', 'beans'],
- 	link => 'http://flowdock.com'});
+   flow => 'myflow',
+   event => 'mail',
+   source => 'Perl Flowdock API',
+   address => 'foo@bar.baz',
+   subject => 'Test message',
+   content => "<h2>IT'S ALIVE</h2><p>This is only slightly crazy.</p>",
+   tags => ['cool', 'beans'],
+   link => 'http://flowdock.com'});
 ```
 
 You can view whatever gets returned by using Data::Dumper:
-```perl
+```
 use Data::Dumper;
 print Dumper($response);
 ```
