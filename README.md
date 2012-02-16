@@ -105,7 +105,24 @@ But wait! There's more! You can send multiple messages at once:
 my $response = $rest_message->send_message(\%one_hash, \%two_hash, \%three_hash, \%four);
 ```
 
-or by separating multiple hashes in {} with a comma
+or by separating hashes with commas:
+
+```
+my $response = $rest_message->send_message(
+   {
+      event => 'message', #Or 'status' for status updates
+      flow => 'myflow',
+      content => 'Hello, how are you?!',
+      tags => ["todo", "beans"]
+   },
+   {
+        event => 'status'
+        flow => 'myflow',
+        content => 'I just set a status message too!'
+   }
+);
+```
+
 
 You can view whatever gets returned by using Data::Dumper:
 
