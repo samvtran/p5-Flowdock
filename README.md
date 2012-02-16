@@ -30,7 +30,6 @@ my $flow = Flowdock::Push->new(
    source => 'myapp',
    project => 'my project',
    from => { name => 'John Doe', address => 'foo@bar.com' });
-
 $flow->send_message({
    subject => 'Hello, World!',
    content => '<h2>IT'S ALIVE!</h2><p>It's sort of a pun</p>',
@@ -75,7 +74,7 @@ my $response = $rest_message->send_message({
 ```
 
 Sending a message to the Team Inbox as an authenticated user (may be broken...sorry):
-```
+```perl
 my $response = $rest_message->send_message({
 	flow => 'myflow',
 	event => 'mail',
