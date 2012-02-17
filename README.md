@@ -14,7 +14,7 @@ Dependencies
 ------------
 Flowdock::Push requires LWP::UserAgent and Moose.
 
-Flowdock::REST requires Moose, Moose::Util::TypeConstraints, REST::Client, JSON::XS, and Email::Valid.
+Flowdock::REST and Flowdock::Stream requires Moose, Moose::Util::TypeConstraints, LWP::UserAgent, JSON::XS, and Email::Valid.
 
 Known Issues
 ------------
@@ -23,11 +23,7 @@ HTML currently doesn't work when sending a message to the Team Inbox via Flowdoc
 Usage Example
 ----------------------
 
-To use this experimental module without installing it anywhere, place lib where your Perl script is and run the following so Perl can find the library:
-
-```
-perl -Ilib foo.pl
-```
+To use this experimental module without installing it anywhere, place lib where your Perl script is and use ```-Ilib```
 
 Pushing an anonymous message to the Team Inbox:
 
@@ -38,7 +34,7 @@ my $flow = Flowdock::Push->new(
    source => 'myapp',
    project => 'my project',
    from => { name => 'John Doe', address => 'foo@bar.com' });
-$flow->send_inbox_message({
+$flow->push_to_team_inbox({
    subject => 'Hello, World!',
    content => '<h2>IT'S ALIVE!</h2><p>It's sort of a pun</p>',
    tags => ['not','really'],
@@ -48,7 +44,7 @@ $flow->send_inbox_message({
 Pushing an anonymous message to the chat:
 
 ```
-$flow->send_chat_message({
+$flow->push_to_chat({
    content => 'How\'s it going?',
    external_user_name => 'Perlicious',
    tags => ['chat', 'api']});
@@ -99,7 +95,29 @@ my $response = $rest_message->send_message({
    link => 'http://flowdock.com'});
 ```
 
+You can stream from a single or multiple flows as such:
+
+```
+use Flowdock::Stream;
+my $stream = Flowdock::Stream->new(
+    username => 'Pablo',            # Use a username/password combo
+    password => 'Picasso',
+	personal_token => 'YOUR_TOKEN', # Or use a token instead
+	org => 'foobar');
+my $function = sub {
+             my $data = shift;
+             if ($data) {
+                if($data->{event} eq 'message') { print "$data->{content} \n" }
+             }
+             return 'true';
+}
+$stream->stream_flow('main', $function); #One flow
+$stream->stream_flows(['foo','main'], $function); #Multiple flows
+```
+
 But wait! There's more! You can send multiple messages at once:
+----------------------
+
 
 ```
 my $response = $rest_message->send_message(\%one_hash, \%two_hash, \%three_hash, \%four);
@@ -116,13 +134,12 @@ my $response = $rest_message->send_message(
       tags => ["todo", "beans"]
    },
    {
-        event => 'status'
-        flow => 'myflow',
-        content => 'I just set a status message too!'
+      event => 'status'
+      flow => 'myflow',
+      content => 'I just set a status message too!'
    }
 );
 ```
-
 
 You can view whatever gets returned by using Data::Dumper:
 
@@ -130,4 +147,6 @@ You can view whatever gets returned by using Data::Dumper:
 use Data::Dumper;
 print Dumper($response);
 ```
-list_flows returns an array of hashes while get_flow returns a single hash of the flow.
+For Flowdock::REST, list_flows returns an array of hashes while get_flow returns a single hash of the flow.
+
+For Flowdock::Stream, stream_flows and stream_flow return a hash of whatever was sent from the server.

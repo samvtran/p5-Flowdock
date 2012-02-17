@@ -1,4 +1,5 @@
 package Flowdock::Push;
+use Flowdock::Tag;
 use Carp;
 use Moose;
 use LWP::UserAgent;
@@ -15,8 +16,6 @@ Better pod documentation
 
 =cut
 
-# Instead of using required, we're using the croaks in BUILD for custom error messages.
-# There's a better way to do this for sure.
 has api_token => (
 	is => 'ro',
 	isa => 'Str');
@@ -27,14 +26,16 @@ has source => (
 
 has project => (
 	is => 'ro',
-	required => 0,
 	isa => 'Str');
 
 has from => (
 	is => 'ro',
 	isa => 'HashRef');
 
-my $flowdock_api_url = "https://api.flowdock.com/v1/messages";
+has flowdock_api_url => (
+	is => 'rw',
+	isa => 'Str',
+	default => 'https://api.flowdock.com/v2/messages');
 
 =head1 METHODS
 
@@ -59,7 +60,7 @@ sub BUILD {
 
 }
 
-=head2 send_inbox_message
+=head2 push_to_team_inbox
 
 Sends a message to the Team Inbox
 
@@ -68,7 +69,7 @@ Optional: from_name, project, link, tags
 
 =cut
 
-sub send_inbox_message {
+sub push_to_team_inbox {
 	my ($self, @messages) = @_;
 	for my $message (@messages){
 		$message->{content} && $message->{subject} or croak "Message must have both subject and content";
@@ -87,18 +88,15 @@ sub send_inbox_message {
 		$params{project} = $self->project() if $self->project();
 		$params{link} = $message->{link} if $message->{link};
 
-		# Tags take a little more work
-		# First make sure they're in an array, then join, then add them if they even exist. Oy vey.
 		my $tags;
-		if ($message->{tags} && ref($message->{tags}) ne 'ARRAY') { croak "Tags must be in an array; e.g. ['foo', 'bar']"; }
-		if ($message->{tags} && scalar(@{$message->{tags}}) > 0) { $tags = join(",",@{$message->{tags}}); }
+		if ($message->{tags}) { $tags = Flowdock::Tag->new($message->{tags}); }
 		$params{tags} = $tags if $tags;
 
 		my $send = $self->post_message(\%params,'team_inbox');
 	}
 }
 
-=head2 send_chat_message
+=head2 push_to_chat
 
 Sends a chat message
 
@@ -107,7 +105,7 @@ Optional: tags
 
 =cut
 
-sub send_chat_message {
+sub push_to_chat {
 	my ($self, @messages) = @_;
 	for my $message (@messages){
 		$message->{content} or croak "Message must have content.";
@@ -122,8 +120,7 @@ sub send_chat_message {
 
 		# Optional tags
 		my $tags;
-		if ($message->{tags} && ref($message->{tags}) ne 'ARRAY') { croak "Tags must be in an array; e.g. ['foo', 'bar']"; }
-		if ($message->{tags} && scalar(@{$message->{tags}}) > 0) { $tags = join(",",@{$message->{tags}}); }
+		if ($message->{tags}) { $tags = Flowdock::Tag->new($message->{tags}); }
 		$params{tags} = $tags if $tags;
 
 		my $send = $self->post_message(\%params, 'chat');
@@ -156,7 +153,7 @@ Constructs the correct URL
 
 sub get_flowdock_api_url {
 	my ($self, $location) = @_;
-	return "$flowdock_api_url/$location/".$self->api_token();
+	return $self->flowdock_api_url()."/$location/".$self->api_token();
 }
 
 __PACKAGE__->meta->make_immutable;
