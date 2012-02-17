@@ -115,9 +115,9 @@ $stream->stream_flow('main', $function); #One flow
 $stream->stream_flows(['foo','main'], $function); #Multiple flows
 ```
 
-But wait! There's more! You can send multiple messages at once:
+But wait! There's more! 
 ----------------------
-
+You can send multiple messages at once:
 
 ```
 my $response = $rest_message->send_message(\%one_hash, \%two_hash, \%three_hash, \%four);
