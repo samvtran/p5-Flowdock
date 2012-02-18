@@ -150,3 +150,11 @@ print Dumper($response);
 For Flowdock::REST, list_flows returns an array of hashes while get_flow returns a single hash of the flow.
 
 For Flowdock::Stream, stream_flows and stream_flow return a hash of whatever was sent from the server.
+
+License, et al.
+-------
+Copyright (C) 2012, Sam Tran.
+
+This module is free software; you can redistribute it and/or modify it under the terms of the Artistic License 2.0. For details, see the full text of the license in the file LICENSE.
+
+This program is distributed in the hope that it will be useful, but it is provided "as is" and without any express or implied warranties. For details, see the full text of the license in the file LICENSE.
