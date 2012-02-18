@@ -14,7 +14,7 @@ Dependencies
 ------------
 Flowdock::Push requires LWP::UserAgent and Moose.
 
-Flowdock::REST and Flowdock::Stream requires Moose, Moose::Util::TypeConstraints, LWP::UserAgent, JSON::XS, and Email::Valid.
+Flowdock::REST and Flowdock::Stream require Moose, Moose::Util::TypeConstraints, LWP::UserAgent, JSON::XS, and Email::Valid.
 
 Known Issues
 ------------
@@ -81,7 +81,7 @@ my $response = $rest_message->send_message({
    tags => ["todo", "beans"]});
 ```
 
-Sending a message to the Team Inbox as an authenticated user (may be broken...sorry):
+Sending a message to the Team Inbox as an authenticated user (may be broken for HTML...sorry):
 
 ```
 my $response = $rest_message->send_message({
@@ -95,7 +95,7 @@ my $response = $rest_message->send_message({
    link => 'http://flowdock.com'});
 ```
 
-You can stream from a single or multiple flows as such:
+You can stream from a single or multiple flows:
 
 ```
 use Flowdock::Stream;
@@ -128,13 +128,13 @@ or by separating hashes with commas:
 ```
 my $response = $rest_message->send_message(
    {
-      event => 'message', #Or 'status' for status updates
+      event => 'message',
       flow => 'myflow',
       content => 'Hello, how are you?!',
       tags => ["todo", "beans"]
    },
    {
-      event => 'status'
+      event => 'status',
       flow => 'myflow',
       content => 'I just set a status message too!'
    }
