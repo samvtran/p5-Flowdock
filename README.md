@@ -1,9 +1,12 @@
-Perl interface to the Flowdock API
+Perl interface to the Flowdock API *REWRITE BRANCH*
 ==================================
 
 A simple pimple Perl module that mimicks more or less how the Ruby Gem for the Flowdock API works.
 
-A **HUGE** work in progress, so please help me make it not suck.
+This branch is a rewrite of the module whilst also taking advantage of new API functionality.
+
+Current focus: REST API, moving Moose to Moo, and LWP::UserAgent to HTTP::Tiny
+
 
 API Notes
 ---------
@@ -12,13 +15,12 @@ https://www.flowdock.com/api
 
 Dependencies
 ------------
+New work on Flowdock::REST requires only Moo, HTTP::Tiny, JSON::XS, and Email::Valid and at least Perl 5.10
+
+(NOTE: The following have no yet been rewritten)
 Flowdock::Push requires LWP::UserAgent and Moose.
 
-Flowdock::REST and Flowdock::Stream require Moose, Moose::Util::TypeConstraints, LWP::UserAgent, JSON::XS, and Email::Valid.
-
-Known Issues
-------------
-HTML currently doesn't work when sending a message to the Team Inbox via Flowdock::REST. It works fine through Flowdock::Push, however, so use that if you can.
+Flowdock::Stream require Moose, Moose::Util::TypeConstraints, LWP::UserAgent, JSON::XS, and Email::Valid.
 
 Usage Example
 ----------------------

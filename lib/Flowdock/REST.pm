@@ -1,100 +1,112 @@
 package Flowdock::REST;
-use Flowdock::Tag;
+use Moo;
 use Carp;
-use Moose;
-use Moose::Util::TypeConstraints;
-use LWP::UserAgent;
+use HTTP::Tiny;
 use JSON::XS;
 use Email::Valid;
+use MIME::Base64;
 use namespace::autoclean;
+use v5.10.1;
 
 =head1 NAME
 
 Flowdock::REST - An interface to Flowdock's REST API
 
-=head1 TODO
-
-Refactor the way tags are set since we use this in the Push API too.
-Refactor the Team Inbox code so that the REST and Push APIs use the same code
-Refactor the messages overall so we can just change event to match what's being sent,
-but the Team Inbox stuff needs to be refactored first.
-Figure out the best way to even populate the Team Inbox stuff from here. Probably add ways to do it from the REST object too.
-Add user parameter to list_flows
-
 =cut
-
-subtype 'Email'
-    => as 'Str'
-    => where { Email::Valid->address($_) }
-    => message { "$_ is not a valid email address" };
 
 has username => (
 	is => 'ro',
-	isa => 'Email');
+	isa => sub {
+		croak "$_[0] is not an email address" unless Email::Valid->address($_[0]);
+	});
 
 has password => (
-	is => 'ro',
-	isa => 'Str');
+	is => 'ro');
 
 has personal_token => (
-	is => 'ro',
-	isa => 'Str');
+	is => 'ro');
 
 has org => (
 	is => 'ro',
-	isa => 'Str',
 	required => 1);
 
 has flow => (
-	is => 'rw',
-	isa => 'Str');
+	is => 'rw');
 
 has messages => (
 	is => 'ro',
-	isa => 'ArrayRef');
+#	isa => 'ArrayRef'
+	isa => sub {
+		croak "$_[0] is not an array reference" unless ref($_[0]) eq 'ARRAY';
+	});
 
 has base_url => (
 	is => 'rw',
-	isa => 'Str');
+	default => sub { return "https://api.flowdock.com/v2/flows"; });
+
+has http_client => (
+	is => 'rw',
+	isa => sub {
+		croak "$_[0] must be an HTTP::Tiny client" unless ref($_[0]) eq 'HTTP::Tiny';
+	},
+	default => sub {
+		return HTTP::Tiny->new;
+	});
+
+has basic_auth => (
+	is => 'rw');
 
 =head1 METHODS
+
+=head2 new
+
+Flowdock::REST->new(\%parameters);
 
 =head2 BUILD
 
 Constructs the REST object.
 
-Required: username/password OR personal_token
+Required: username/password or personal_token
 Optional: org, flow, messages
-NOTE: flow will be used for get_flow if flow isn't passed to it explicitly.
+NOTE: This flow is used only if a flow isn't explicitly passed elsewhere.
 
 =cut
 
 sub BUILD {
 	my $self = shift;
-	if ($self->username()) {
-		$self->password() or croak "If supplying a username, must have a password.";
-		$self->base_url("https://".$self->username().":".$self->password()."\@api.flowdock.com/v2/flows");
-	} elsif ($self->personal_token()) {
-		$self->base_url("https://".$self->personal_token()."\@api.flowdock.com/v2/flows");
-	} else { croak "You must supply either username/password or a personal token"; }
+	if ($self->username) {
+		$self->password or croak "You forgot to enter a password.";
+		$self->basic_auth('Basic '.encode_base64($self->username.":".$self->password, q{}));
+	} elsif ($self->personal_token) {
+		$self->basic_auth('Basic '.encode_base64($self->personal_token, q{}));
+	} else { croak "You must supply your username/password or a personal token"; }
+	$self->http_client(HTTP::Tiny->new(
+		default_headers => {
+			'Authorization' => $self->basic_auth,
+		},
+	));
 }
 
 =head2 list_flows
 
+$rest->list_flows($boolean);
+
 Lists all flows for a user.
 
-Optional: 1/0 boolean indicating whether to include the users in a flow or not
+Optional: boolean indicating whether to include the users in a flow or not
 
 =cut
 
 sub list_flows {
 	my ($self, $users) = @_;
-	unless ($users) { $users = 0; }
-	my $response = $self->rest_action_get($self->base_url()."?users=".$users);
+	$users = $users ? $users : 0;
+	my $response = $self->_get($self->base_url(), {users => $users});
 	return $response;
 }
 
 =head2 get_flow
+
+$rest->get_flow($flow_name);
 
 Gets a particular flow's information
 
@@ -105,123 +117,175 @@ NOTE: By leaving flow out, you must have flow from the Flowdock::REST object set
 
 sub get_flow {
 	my ($self, $flow) = @_;
-	my $url;
-	if ($flow) { $url = $self->get_flowdock_api_url($self->{org}, $flow); }
-	elsif ($self->{flow}) { $url = $self->get_flowdock_api_url($self->{org}, $self->{flow}); }
-	else { croak "You must provide flow through the Flowdock::REST object or when using get_flow()"; }
-	return $self->rest_action_get($url);
+	my $url = $self->_get_api_url($self->{org}, $flow ? $flow : $self->{flow});
+	return $self->_get($url);
 }
 
 =head2 send_message
 
+$rest->send_message(\%message);
+$rest->send_message([\%message,\%message2,...]);
+
 Sends a message to the inbox or chat or sets the status of the user
 
-Required for all: event, content
-Required for mail: subject, address, source
-Optional for all: flow, tags
-Optional for mail: from_name, project, link
+Required: event, content
+Optional: flow, tags, external_user_name (anonymizes message)
 
 NOTE: By leaving flow out, you must have flow from the Flowdock::REST object set.
+
+Current events and their required elements
+++Complete
+
+++message | content
+++status | content
+++file | content (full path to file), file_name
+action | content => { type, description }
+
+comment | content !!!VOLATILE
+tag-change | content => { message, add, remove } !!!VOLATILE
+user | content !!!VOLATILE
 
 =cut
 
 sub send_message {
 	my ($self, @messages) = @_;
-	my $url;
 	for my $message (@messages) {
-		if ($message->{flow}) { $url = $self->get_flowdock_api_url($self->{org}, $message->{flow}, 'messages'); }
-		elsif ($self->{flow}) { $url = $self->get_flowdock_api_url($self->{org}, $self->{flow}, 'messages'); }
-		else { croak "You must specify a flow in the main Flowdock::REST object or when using send_chat_message"; }
+		my $flow = $message->{flow} ? $message->{flow} : $self->{flow};
+		croak "You must specify a flow" unless $flow;
+		croak "Your message must have content" unless $message->{content};
+		croak "You must specify an event" unless $message->{event};
 
-		$message->{content} or croak "Your message must have content";
-		$message->{event} or croak "You must specify an event";
+		my $url = $self->_get_api_url($self->{org}, $flow , 'messages');
+		my %params = (event => $message->{event});
 
-		my %params;
-		if ($message->{event} eq 'message' || $message -> {event} eq 'status') {
-			%params = (
-				event => $message->{event},
-				content => $message->{content});
-			my $tags;
-			if ($message->{tags}) { $tags = Flowdock::Tag->new($message->{tags}); }
-			$params{tags} = $tags if $tags;
+		given($message->{event}) {
+			when('message' || 'event') {
+				$params{content} = $message->{content};
+				if($message->{tags}) {
+					$params{tags} = ref($message->{tags}) eq 'ARRAY'
+					    ? join(',', $message->{tags}) : $message->{tags};
+				}
+				$self->_post($url, \%params);
+			}
+			when('file') {
+				croak "You must provide a file name" unless $message->{file_name};
+				open (my $fh, '<', $message->{content});
+				binmode $fh;
+				$params{content} = {
+					data => encode_base64(local $/ = <$fh>),
+					file_name => $message->{file_name},
+				};
+				$self->_post_file($url, encode_json \%params);
+				close $fh;
+			}
 		}
-
-		elsif ($message->{event} eq 'mail') {
-			$message->{subject} && $message->{address} or croak "The message is missing a subject and/or the address attribute";
-			$message->{source} && $message->{source} =~ /^[0-9a-z_ ]+$/i or croak "The flow must have a valid source attribute when posting to the Team Inbox and must only contain alphanumeric characters, underscores, or spaces.";
-
-			# Parameters to include in the POST
-			%params = (
-				source => $message->{source},
-				event => $message->{event},
-				format => 'html', #The only format supported for now
-				from_address => $message->{address},
-				subject => $message->{subject},
-				content => $message->{content});
-
-			# Optional parameters
-			$params{from_name} = $message->{name} if $message->{name};
-			$params{project} = $message->{project} if $message->{project};
-			$params{link} = $message->{link} if $message->{link};
-
-			my $tags;
-			if ($message->{tags}) { $tags = Flowdock::Tag->new($message->{tags}); }
-			$params{tags} = $tags if $tags;
-
-		}
-		else { croak "You must use an event of type 'message', 'status', or 'mail'."; }
-
-		#my $json_params = encode_json \%params;
-		#$self->rest_action_post($url, $json_params);
-		$self->rest_action_post($url, \%params);
 	}
 
 }
 
-=head2 rest_action_get
+=head2 list_messages
+
+$rest->list_messages(\%filter_params);
+$rest->list_messages([\%params1, \%params2,...]);
+
+Lists messages from a flow or multiple flows
+
+Parameters:
+event (can be comma separated list in a string)
+limit
+sort: 'asc' or defaults to descending
+since_id
+until_id
+tags: comma separated or array. Can also search by user ID
+tag_mode: 'and' (default) or 'or'
+search: full text search by keywords separated by spaces
+
+Returns an array containing all
+
+=cut
+
+sub list_messages {
+	my ($self, @messages) = @_;
+	my @responses;
+	for my $message (@messages) {
+		my $flow = $message->{flow} ? delete $message->{flow} : $self->{flow};
+		croak "You must specify a flow" unless $flow;
+		my $url = $self->_get_api_url($self->{org}, $flow , 'messages');
+		my %params = ();
+		if($message->{tags}) {
+			$params{tags} = ref($message->{tags}) eq 'ARRAY' ? join(',', $message->{tags}) : $message->{tags};
+			delete $message->{tags};
+		}
+		keys %$message;
+		while(my($k, $v) = each %$message) {
+			$params{$k} = $v;
+		}
+		my $response = $self->_get($url, \%params);
+		push @responses, $response;
+	}
+	return \@responses;
+}
+
+
+=head2 _get
 
 Performs the GET actions
 
 =cut
 
-sub rest_action_get {
-	my ($self, $url) = @_;
-	my $ua = LWP::UserAgent->new;
-	my $response;
-	$response = $ua->get($url);
-	return decode_json $response->decoded_content;
+sub _get {
+	my ($self, $url, $params) = @_;
+#	my $http = $self->http_client;
+	$params = $params ? "?".$self->http_client->www_form_urlencode($params) : '';
+	my $response = $self->http_client->get($url.$params);
+	$response->{success} or croak "$response->{status} $response->{reason}\n" ;
+	return decode_json $response->{content};
 }
 
-=head2 rest_action_post
+=head2 _post
 
-Performs the POST actions
+Performs the POST actions for forms
 
 =cut
 
-sub rest_action_post {
+sub _post {
 	my ($self, $url, $params) = @_;
-	my $ua = LWP::UserAgent->new;
-	my $response = $ua->post( $url, Content => $params);
-	if ($response->is_success) {
-		print "Success! Your message has been sent to Flowdock.\n";
-	} else {
-		die $response->status_line;
-	}
-
+	my $response = $self->http_client->post_form($url, $params);
+	croak "$response->{status} $response->{reason}\n" unless $response->{success};
+	print "Success! $response->{status}\n";
+	return 1;
 }
 
-=head2 get_flowdock_api_url
+=head2 _post_file
+
+Performs a POST action for files using JSON
+
+=cut
+
+sub _post_file {
+	my ($self, $url, $params) = @_;
+	my $response = $self->http_client->post($url, {
+		content => $params,
+		headers => {
+			'Content-Type' => 'application/json',
+			'Authorization' => $self->basic_auth,
+		}
+	});
+	croak "$response->{status} $response->{reason}\n" unless $response->{success};
+	print "Success! $response->{status}\n";
+	return 1;
+}
+
+=head2 _get_api_url
 
 Constructs the proper URL; i.e., separates the various parts with /
 
 =cut
 
-sub get_flowdock_api_url {
-	my ($self, @url_parts) = @_;
-	my $url = $self->base_url();
-	for my $part (@url_parts) {
-		$url.="/$part";
-	}
+sub _get_api_url {
+	my $self = shift;
+	my (@url_parts) = @_;
+	my $url = $self->base_url()."/".join('/', @url_parts);
 	return $url;
 }
 __PACKAGE__->meta->make_immutable;
