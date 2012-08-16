@@ -1,8 +1,11 @@
 package Flowdock::Push;
-use Flowdock::Tag;
+use strict;
+use warnings;
 use Carp;
-use Moose;
-use LWP::UserAgent;
+use Moo;
+use HTTP::Tiny;
+use Email::Valid;
+use MIME::Base64;
 use namespace::autoclean;
 
 =head1 NAME
@@ -17,55 +20,77 @@ Better pod documentation
 =cut
 
 has api_token => (
-	is => 'ro',
-	isa => 'Str');
+	is => 'ro');
 
 has source => (
-	is => 'ro',
-	isa => 'Str');
+	is => 'ro');
 
 has project => (
-	is => 'ro',
-	isa => 'Str');
+	is => 'ro');
 
 has from => (
 	is => 'ro',
-	isa => 'HashRef');
+	isa => sub {
+		croak '\%from is not a hash reference' unless ref($_[0]) eq 'HASH';
+		croak '\%from does not contain a valid email address'
+			unless $_[0]->{address} && Email::Valid->address($_[0]->{address});
+	});
 
-has flowdock_api_url => (
+has base_url => (
 	is => 'rw',
-	isa => 'Str',
-	default => 'https://api.flowdock.com/v2/messages');
+	default => sub { return 'https://api.flowdock.com/v2/messages'; });
+
+has http_client => (
+	is => 'rw',
+	isa => sub {
+		croak "$_[0] must be an HTTP::Tiny client" unless ref($_[0]) eq 'HTTP::Tiny';
+	},
+	default => sub {
+		return HTTP::Tiny->new;
+	});
+
+has basic_auth => (
+	is => 'rw');
 
 =head1 METHODS
 
-=head2 BUILD
+=head2 new
+
+my $pusher = Flowdock::Push->new($api_token, $source, \%from)
 
 Builds the initial Flowdock Push object.
 
-Required: api_token
-Optional: source, project
+Required: api_token, source, \%from->{address}
+Optional: project, \%from->{name}
 
 =cut
 
 sub BUILD {
 	my $self = shift;
 	$self->api_token()
-	    or croak "Flow must have api_token attribute";
+		or croak "Flow must have api_token attribute";
+	$self->basic_auth('Basic '.encode_base64($self->api_token(), q{}));
 	# Source is only required for send_message, so keep it here so you don't have to repeat, but check in send_message
 	if ($self->source() && $self->source() !~ /^[0-9a-z_ ]+$/i) {
 	    croak "Optional source attribute can only contain alphanumeric characters and underscores"; }
 	if ($self->project() && $self->project() !~ /^[0-9a-z_ ]+$/i) {
 		croak "Optional attribute project can only contain alphanumeric characters and underscores"; }
-
+	$self->from() && $self->from()->{address} or croak "Must have an address!";
+	$self->http_client(HTTP::Tiny->new(
+		default_headers => {
+			'Authorization' => $self->basic_auth,
+		},
+	));
 }
 
 =head2 push_to_team_inbox
 
+$pusher->push_to_team_inbox($content, $subject, \%from->{name}, $project, $link, $tags|\@tags)
+
 Sends a message to the Team Inbox
 
-Required: content, subject, source, address
-Optional: from_name, project, link, tags
+Required: content, subject
+Optional: from_name, project, link, tags (comma-separated or arrayref)
 
 =cut
 
@@ -74,29 +99,34 @@ sub push_to_team_inbox {
 	for my $message (@messages){
 		$message->{content} && $message->{subject} or croak "Message must have both subject and content";
 		$self->from()->{address} or croak "The flow's from attribute is missing the address attribute";
+		$self->source() or croak "The flow must have a valid source attribute when posting to the Team Inbox";
 
-		$self->{source} or croak "The flow must have a valid source attribute when posting to the Team Inbox";
-		# Parameters to include in the POST
-		my %params = (
-			source => $self->source(),
-			format => 'html', #The only format supported for now
+		# Required (also format, which isn't required)
+		my $params = {
+			source       => $self->source(),
+			format       => 'html', #The only format supported for now
 			from_address => $self->from()->{address},
-			subject => $message->{subject},
-			content => $message->{content});
+			subject      => $message->{subject},
+			content      => $message->{content}
+		};
+
 		# Optional parameters
-		$params{from_name} = $self->from()->{name} if $self->from()->{name};
-		$params{project} = $self->project() if $self->project();
-		$params{link} = $message->{link} if $message->{link};
+		$params->{from_name} = $self->from()->{name} if $self->from()->{name};
+		$params->{project}   = $self->project() if $self->project();
+		$params->{link}      = $message->{link} if $message->{link};
 
-		my $tags;
-		if ($message->{tags}) { $tags = Flowdock::Tag->new($message->{tags}); }
-		$params{tags} = $tags if $tags;
+		if($message->{tags}) {
+			$params->{tags} = $message->{tags} eq 'ARRAY'
+				? join(',', $message->{tags}) : $message->{tags};
+		}
 
-		my $send = $self->post_message(\%params,'team_inbox');
+		my $send = $self->_post('team_inbox', $params);
 	}
 }
 
 =head2 push_to_chat
+
+$pusher->push_to_chat($content, $external_user_name, \@tags)
 
 Sends a chat message
 
@@ -108,52 +138,51 @@ Optional: tags
 sub push_to_chat {
 	my ($self, @messages) = @_;
 	for my $message (@messages){
-		$message->{content} or croak "Message must have content.";
-		# TODO Figure out what isn't acceptable for user names
-		$message->{external_user_name} #&& $message->{external_user_name} =~ /^[0-9a-z_]+$/i #No spaces for sure, what else though?
-		    or croak "Must have external_user_name";
+		$message->{content} && length $message->{content} <= 8096 or croak "Message must have content and be less than 8096 characters.";
+		$message->{external_user_name} or croak "Must have external_user_name";
+		$message->{external_user_name} =~ /^[\S]+$/i or croak "Username cannot have whitespace";
 
-		# Parameters to include in the POST
-		my %params = (
-			content => $message->{content},
-			external_user_name => $message->{external_user_name});
+
+		# Required params
+		my $params = {
+			content            => $message->{content},
+			external_user_name => $message->{external_user_name}
+		};
 
 		# Optional tags
-		my $tags;
-		if ($message->{tags}) { $tags = Flowdock::Tag->new($message->{tags}); }
-		$params{tags} = $tags if $tags;
+		if($message->{tags}) {
+			$params->{tags} = $message->{tags} eq 'ARRAY'
+				? join(',', $message->{tags}) : $message->{tags};
+		}
 
-		my $send = $self->post_message(\%params, 'chat');
+		my $send = $self->_post('chat', $params);
 	}
 }
 
-=head2 post_message
+=head2 _post
 
-Uses LWP::UserAgent to POST the message
+POST message to Flowdock
 
 =cut
 
-sub post_message {
-	my ($self, $params, $location) = @_;
-	my $ua = LWP::UserAgent->new;
-	my $url = $self->get_flowdock_api_url($location);
-	my $response = $ua->post( $url, Content => $params);
-	if ($response->is_success) {
-		print "Success! Your message has been sent to Flowdock.\n";
-	} else {
-		die $response->status_line;
-	}
+sub _post {
+	my ($self, $location, $params) = @_;
+	my $url = $self->_get_api_url($location);
+	my $response = $self->http_client->post_form($url, $params);
+	croak "$response->{status} $response->{reason}\n $response->{content}\n" unless $response->{success};
+	print "Success! $response->{status}\n";
+	return 1;
 }
 
-=Head2 get_flowdock_api_url
+=Head2 _get_api_url
 
-Constructs the correct URL
+Constructs the proper URL; i.e., separates the various parts with /
 
 =cut
 
-sub get_flowdock_api_url {
+sub _get_api_url {
 	my ($self, $location) = @_;
-	return $self->flowdock_api_url()."/$location/".$self->api_token();
+	return $self->base_url()."/$location/".$self->api_token();
 }
 
 __PACKAGE__->meta->make_immutable;
