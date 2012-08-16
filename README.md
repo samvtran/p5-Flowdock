@@ -1,11 +1,9 @@
-Perl interface to the Flowdock API *REWRITE BRANCH*
+Perl interface to the Flowdock API
 ==================================
 
 A simple pimple Perl module that mimicks more or less how the Ruby Gem for the Flowdock API works.
 
-This branch is a rewrite of the module whilst also taking advantage of new API functionality.
-
-Current focus: REST API, moving Moose to Moo, and LWP::UserAgent to HTTP::Tiny
+This module has been rewritten(ish) and has replaced Moose with Moo and LWP::UserAgent with HTTP::Tiny
 
 
 API Notes
@@ -25,13 +23,8 @@ Dependencies
 * Email::Valid
 * URI::Encode
 
-
-Flowdock::Stream require Moose, Moose::Util::TypeConstraints, LWP::UserAgent, JSON::XS, and Email::Valid.
-
 Usage Examples
 ----------------------
-
-To use this experimental module without installing it anywhere, place lib where your Perl script is and use ```-Ilib```
 
 Pushing an anonymous message to the Team Inbox:
 
