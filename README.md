@@ -115,7 +115,7 @@ my $stream = Flowdock::Stream->new(
 	 org => 'foobar');
 
 $stream->stream_flows(
-   flows => 'blah/flow',
+   flows => 'flow',
    on_event => sub {
       my ($body, $headers) = @_;
       print JSON::XS->new->pretty->encode($response);
