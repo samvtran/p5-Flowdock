@@ -4,7 +4,7 @@ use warnings;
 use Moo;
 use Carp;
 use HTTP::Tiny;
-use JSON::XS;
+use JSON;
 use Email::Valid;
 use MIME::Base64;
 use URI::Encode qw/uri_encode uri_decode/;

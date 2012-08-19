@@ -17,14 +17,16 @@ Dependencies
 * Perl >= 5.10
 * Moo
 * HTTP::Tiny (Flowdock::REST and Flowdock::Push)
-* Net::Curl::Easy (Flowdock::Stream)
+* AnyEvent::HTTP (Flowdock::Stream)
 * IO::Socket::SSL
-* JSON::XS
+* JSON
 * Email::Valid
 * URI::Encode
 
 Usage Examples
 ----------------------
+
+### Flowdock::Push
 
 Pushing an anonymous message to the Team Inbox:
 
@@ -37,7 +39,7 @@ my $flow = Flowdock::Push->new(
    from => { name => 'John Doe', address => 'foo@bar.com' });
 $flow->push_to_team_inbox({
    subject => 'Hello, World!',
-   content => '<h2>IT'S ALIVE!</h2><p>It's sort of a pun</p>',
+   content => '<h2>Hooray!</h2><p>It works!</p>',
    tags => ['not','really'],
    link => 'http://flowdock.com'});
 ```
@@ -50,6 +52,8 @@ $flow->push_to_chat({
    external_user_name => 'Perl Flowdock',
    tags => ['chat', 'api']});
 ```
+
+### Flowdock::REST
 
 Authenticating with username/password or a token:
 
@@ -75,7 +79,7 @@ my $response = $rest_message->send_message({
 });
 ```
 
-Sending a message to the Team Inbox as an authenticated user (may be broken for HTML...sorry):
+Sending a message to the Team Inbox as an authenticated user:
 
 ```
 my $response = $rest_message->send_message({
@@ -95,25 +99,41 @@ You can send multiple messages at once:
 my $response = $rest_message->send_message(\%one_hash, \%two_hash, \%three_hash, \%four);
 ```
 
-You can stream from a single or multiple flows:
+### Flowdock::Stream
+
+Flowdock::Stream uses AnyEvent::HTTP; thus, the module is non-blocking and doesn't require you to use any particular system. Below is an example using a simple AnyEvent loop:
 
 ```
 use Flowdock::Stream;
+use AnyEvent;
+use JSON;
+
 my $stream = Flowdock::Stream->new(
    username => 'Pablo',            # Use a username/password combo
    password => 'Picasso',
 	 personal_token => 'YOUR_TOKEN', # Or use a token instead
 	 org => 'foobar');
 
-my $callback = sub {
-   my $data = shift;
-   if($data->{event} eq 'message') { print "$data->{content} \n" };
-}
-$stream->stream_flow('main', $callback); #One flow
-$stream->stream_flows(['foo','main'], $callback); #Multiple flows
+$stream->stream_flows(
+   flows => 'blah/flow',
+   on_event => sub {
+      my ($body, $headers) = @_;
+      print JSON::XS->new->pretty->encode($response);
+   },
+   on_disconnect => sub { print "Disconnected\n" },
+   on_keepalive => sub { print "Keep alive sent\n." },
+   on_error => sub { die @_ } #Default uses croak
+);
+$stream->stream_flows(
+   flows => ['foo','main'],
+   ...); #Same as before for multiple flows
+
+print "Stuff going on after the function that isn't blocked\n";
+
+AnyEvent->condvar->recv;
 ```
 
-https://flowdock.com/api/message-types lists what you can expect from the hashref for each mesasge type that can be parsed by your callback function.
+https://flowdock.com/api/message-types lists what you can expect from the hashref for each message type that can be parsed by your callback function.
 
 License, et al.
 -------
